@@ -8,28 +8,49 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
+use_modular_headers!
 
 target 'WindowWise' do
   config = use_native_modules!
 
   use_react_native!(
     :path => config[:reactNativePath],
-    # An absolute path to your application root.
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
+  # Explicitly specify source files
+  pod 'RNSensors', :path => '../node_modules/react-native-sensors', :source_files => '../node_modules/react-native-sensors/ios/*.{h,m}'
+
   post_install do |installer|
-    # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202
     react_native_post_install(
       installer,
       config[:reactNativePath],
-      :mac_catalyst_enabled => false,
-      # :ccache_enabled => true
+      :mac_catalyst_enabled => false
     )
+    # Copy RNSensors files to Pods/ and link them
+    installer.pods_project.targets.each do |target|
+      if target.name == 'RNSensors'
+        # Copy files to Pods/RNSensors
+        source_files = Dir.glob('../node_modules/react-native-sensors/ios/*.{h,m}')
+        target_dir = File.join(Dir.pwd, 'Pods/RNSensors')
+        FileUtils.mkdir_p(target_dir)
+        source_files.each do |file|
+          dest_file = File.join(target_dir, File.basename(file))
+          FileUtils.cp(file, dest_file) unless File.exist?(dest_file)
+        end
+        # Add files to build phase
+        source_files.each do |file|
+          file_ref = installer.pods_project.new_file("Pods/RNSensors/#{File.basename(file)}")
+          target.source_build_phase.add_file_reference(file_ref)
+        end
+      end
+    end
+    # Ensure WindowWise target links RNSensors
+    installer.pods_project.targets.each do |target|
+      if target.name == 'WindowWise'
+        rnsensors_file = installer.pods_project.new_file('Pods/RNSensors/RNSensors.m')
+        target.source_build_phase.add_file_reference(rnsensors_file)
+      end
+    end
   end
 end
