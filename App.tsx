@@ -15,6 +15,7 @@ const PRINTER_WIDTH_PX = 2550; // 8.5 inches * 300 DPI
 const PRINTER_HEIGHT_PX = 3300; // 11 inches * 300 DPI
 
 const App: React.FC = () => {
+  const viewShotRef = useRef<ViewShot>(null);
   const [mapping, setMapping] = useState<boolean>(false);
   const [path, setPath] = useState<{ x: number; y: number }[]>([]);
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 }); // Start at origin (0, 0)
@@ -244,13 +245,18 @@ const App: React.FC = () => {
   };
 
   const exportMap = async () => {
-    setLabeling(false);
-    setExportConfirmVisible(true);
-    if (!viewShotRef.current) {
-      console.error('ViewShot ref is null');
-      Alert.alert('Error', 'Failed to initialize map capture');
-      return;
+  if (viewShotRef.current) {
+    try {
+      const uri = await viewShotRef.current.capture();
+      console.log("Image URI:", uri);
+      setExportConfirmVisible(true);
+    } catch (error) {
+      console.error("Failed to capture screenshot:", error);
     }
+  } else {
+    console.warn("ViewShot ref is not ready yet.");
+  }
+};
 
     try {
       console.log('Starting export process...');
